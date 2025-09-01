@@ -26,6 +26,7 @@ def format_prompt(prompt: str, **values) -> str:
         prompt = re.sub(r"\{\{\s*" + key + r"\s*\}\}", lambda _: str(value), prompt)
     return prompt
 
+
 def _sanitize_justification(justification: str) -> str:
     # Some judge prompts instruct the model to think step by step.
     return justification.replace("Let's think step by step. ", "")
