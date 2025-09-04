@@ -474,7 +474,10 @@ def clean_up_extra_traces(run_id: str, start_time_ms: int) -> None:
 
 def create_minimal_trace(eval_item: "EvalItem") -> Trace:
     """
-    Create a minimal trace object with a single span, based on given inputs/outputs.
+    Create a minimal trace object based on given inputs/outputs.
+
+    Copy over inputs/outputs from the EvalItem to the root span, and copy over
+    retriever spans from the original trace (if any).
     """
     from mlflow.pyfunc.context import Context, set_prediction_context
 
@@ -483,4 +486,16 @@ def create_minimal_trace(eval_item: "EvalItem") -> Trace:
         with mlflow.start_span(name="root_span", span_type=SpanType.CHAIN) as root_span:
             root_span.set_inputs(eval_item.inputs)
             root_span.set_outputs(eval_item.outputs)
-        return mlflow.get_trace(root_span.trace_id)
+            if eval_item.trace:
+                for span in eval_item.trace.search_spans(span_type=SpanType.RETRIEVER):  # pyright: ignore[reportArgumentType]
+                    with mlflow.start_span(
+                        name=span.name,
+                        span_type=span.span_type,
+                    ) as child_span:
+                        child_span.set_inputs(span.inputs)
+                        child_span.set_outputs(span.outputs)
+                        for key, value in span.attributes.items():
+                            child_span.set_attribute(key, value)
+        trace = mlflow.get_trace(root_span.trace_id)
+        assert trace is not None
+        return trace
